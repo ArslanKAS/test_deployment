@@ -91,6 +91,7 @@ with st.sidebar:
         st.write(pine_index)
 
     if st.button("Pine 2 Data"):
+        pinecone.init(api_key = st.session_state["pine_api_key"])
         pine_dataframe = pine2df()
         st.session_state["pine_dataframe"] = pine_dataframe
  
