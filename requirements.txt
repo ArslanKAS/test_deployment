@@ -7,6 +7,7 @@ swifter==1.3.4
 plotly==5.13.1
 streamlit==1.19.0
 matplotlib==3.7.0
+scikit-learn==1.2.1
 pinecone-client==2.2.1
 streamlit-modal==0.1.0
 beautifulsoup4==4.11.2
