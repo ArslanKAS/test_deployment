@@ -1,0 +1,24 @@
+This browser is no longer supported.
+Upgrade to Microsoft Edge to take advantage of the latest features, security updates, and technical support.
+Azure Blob Storage is Microsoft's object storage solution for the cloud
+Blob Storage is optimized for storing massive amounts of unstructured data
+Unstructured data is data that doesn't adhere to a particular data model or definition, such as text or binary data.
+Blob Storage is designed for:
+Users or client applications can access objects in Blob Storage via HTTP/HTTPS, from anywhere in the world
+Objects in Blob Storage are accessible via the Azure Storage REST API, Azure PowerShell, Azure CLI, or an Azure Storage client library
+Client libraries are available for different languages, including:
+Clients can also securely connect to Blob Storage by using SSH File Transfer Protocol (SFTP) and mount Blob Storage containers by using the Network File System (NFS) 3.0 protocol.
+Blob Storage supports Azure Data Lake Storage Gen2, Microsoft's enterprise big data analytics solution for the cloud
+Azure Data Lake Storage Gen2 offers a hierarchical file system as well as the advantages of Blob Storage, including:
+For more information about Data Lake Storage Gen2, see Introduction to Azure Data Lake Storage Gen2.
+Submit and view feedback for
+Serving images or documents directly to a browser.
+Storing files for distributed access.
+Streaming video and audio.
+Writing to log files.
+Storing data for backup and restore, disaster recovery, and archiving.
+Storing data for analysis by an on-premises or Azure-hosted service.
+Low-cost, tiered storage
+Disaster recovery capabilities
+Introduction to Azure Blob storage
+Introduction to Azure Data Lake Storage Gen2

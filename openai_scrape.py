@@ -9,9 +9,9 @@ from streamlit_modal import Modal
 image = Image.open('app_cover.png')
 st.image(image, caption='Sky is the Limit')
 
-st.header("Select Page")
-table_name = st.selectbox('', ['Microsoft Azure'])
-
+st.subheader("Select Page")
+json_files = [f for f in os.listdir("indexes/") if f.endswith(".json")]
+select_url_title = st.selectbox('JSON Files Appear here', json_files, label_visibility='collapsed')
 # Generate Global DataFrame 
 dataframe = pd.DataFrame()
 
@@ -20,13 +20,9 @@ if "dataframe" not in st.session_state:
     st.session_state["dataframe"] = dataframe
 
 
-# ================================ COLUMNS ===================================
-col1, col2, col3, col4 = st.columns(4)
-# ================================ COLUMNS ===================================
-
 # Pop-Up for OpenAI API Key
 modal = Modal(key="Demo Modal", title="")
-open_modal = col4.button("OpenAI API Key")
+open_modal = st.button("OpenAI API Key")
 if open_modal:
     modal.open()
 
@@ -34,12 +30,7 @@ if modal.is_open():
     with modal.container():
         st.subheader('Insert OpenAI API Key')
         api_key = st.text_input(label = "Enter OpenAI API Key", type="password", placeholder="XXXXXXXXXXXXXXXXXX")
-        openai.api_key = api_key
-        st.session_state[openai.api_key] = api_key
-        st.subheader('Insert Pinecone API Key')
-        pine_api_key = st.text_input(label = "Enter Pinecone API Key", type="password", placeholder="XXXXXXXXXXXXXXXXXX")
-        st.session_state["pine_api_key"] = pine_api_key
-        st.session_state[openai.api_key] = api_key
+        st.session_state["OpenAPI API Key"] = api_key
         if st.button("Submit"):
             modal.close()
 
@@ -47,10 +38,11 @@ if modal.is_open():
 # Sidebar Menu
 with st.sidebar:
     # Web Scrape Field and Button
-    url = st.text_input("Enter the URL of the website to scrape:", placeholder="https://en.wikipedia.org")
+    st.subheader("Enter URL")
+    url = st.text_input("Enter the URL:", placeholder="https://en.wikipedia.org", label_visibility='collapsed')
 
     # Scraping Button:
-    if st.button("Scrape"):
+    if st.button("Scrape URL"):
         # Scrap Data from URL
         data = scrape_sentences(url)
 
@@ -68,49 +60,50 @@ with st.sidebar:
             # EncodeCSV so it can be linked
             b64 = base64.b64encode(data_csv.encode()).decode()
             # Generatea link for the Encoded CSV
-            href = f'<a href="data:file/csv;base64,{b64}" download="scraped_data.csv">Download CSV File</a>'
+            href = f'<a href="data:file/csv;base64,{b64}" download="scraped_data.csv">Download CSV</a>'
             # Display the Download link for the Encoded CSV
             st.markdown(href, unsafe_allow_html=True)
         else:
-            st.write("No sentences found that meet the criteria.")
+            st.write("No URL to Scrape.")
 
-    # Want Embedding?
-    table_name = st.text_input("Enter Link Name without Spaces")
-    if st.button("Embedding"):
+    # Save on Cloud
+    st.subheader("Enter URL Title")
+    url_title = st.text_input("Enter URL Title without Brackets", label_visibility='collapsed', placeholder="No Spaces")
+    if st.button("Save Data"):
         # Get Data from the scraped URL
         web_dataframe = st.session_state["web_dataframe"]
-        openai.api_key = st.session_state[openai.api_key]
-        embed_dataframe = embedding(web_dataframe)
-        st.session_state["embedd_dataframe"] = embed_dataframe
+        # Save the Data as Text on Cloud
+        savedftxt(web_dataframe, url_title)
 
-    if st.button("Data 2 Pine"):
-        st.write(st.session_state)
-        pinecone.init(api_key = st.session_state["pine_api_key"])
-        pine_index = df2pine(st.session_state["embedd_dataframe"])
-        st.session_state["pine_index"] = pine_index
-        st.write(pine_index)
+    st.subheader("Perform Data Embedding")
+    if st.button("Data Embedding"):
+        os.environ["OPENAI_API_KEY"] = st.session_state["OpenAPI API Key"]
+        embedding(url_title)
 
-    if st.button("Pine 2 Data"):
-        pinecone.init(api_key = st.session_state["pine_api_key"])
-        pine_dataframe = pine2df()
-        st.session_state["pine_dataframe"] = pine_dataframe
- 
-
-# if col3.button("Set OpenAI API Key"):
-# api_key = st.text_input(label = "Enter OpenAI API Key", type="password")
-# openai.api_key = api_key
-# st.session_state[openai.api_key] = api_key
-    # st.write(st.session_state["api_key"])
 
 
 # Search Query Field and Button
-search_query = st.text_input("Enter Search Query Relevant Page:", placeholder="What is Wikipedia?")
-if st.button("Show results"):
-    
-    openai.api_key = st.session_state[openai.api_key]
-    pine_df = st.session_state["pine_dataframe"]
-    show_results(pine_df, search_query)
+st.subheader("Enter Search Query")
+search_query = st.text_input("Enter Search Query:", placeholder="What is Wikipedia?", label_visibility='collapsed')
 
+
+# ================================ COLUMNS ===================================
+col1, col2, col3, col4 = st.columns(4)
+# ================================ COLUMNS ===================================
+
+results_formating = {
+    "Paragraph"     : " Show in a paragraph.",
+    "Bullet Points" : " Show in bullet points. Each on a new line using <li> or <ul> tags",
+    "Table"         : " Show in a table.",
+    "Concise"       : " Show in a concise manner."
+}
+
+results_format = col1.selectbox('Select Format', results_formating.keys(), label_visibility='collapsed')
+
+if col2.button("Show results"):
+    os.environ["OPENAI_API_KEY"] = st.session_state["OpenAPI API Key"]
+    result_formatted = search_query + results_formating.get(results_format)
+    ask_results(select_url_title, result_formatted)
 
 # Models
 # gpt-3.5-turbo

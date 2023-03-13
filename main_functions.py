@@ -1,16 +1,13 @@
+import os
 import csv
 import base64
-import openai
-import swifter
-import sqlite3
-import pinecone
 import requests
 import numpy as np
 import pandas as pd
 import streamlit as st
 from bs4 import BeautifulSoup
-from openai.embeddings_utils import get_embedding
-from openai.embeddings_utils import cosine_similarity
+from langchain import OpenAI
+from llama_index import SimpleDirectoryReader, GPTListIndex, readers, GPTSimpleVectorIndex, LLMPredictor, PromptHelper
 
 # Web Scraping
 def scrape_sentences(url):
@@ -37,81 +34,49 @@ def scrape_sentences(url):
     web_df = df
     return web_df
 
+# Saving DataFrame as Text File
+def savedftxt(web_df, url_title):
+    # create directory with url_title if it doesn't exist
+    dir_path = f"contents/{url_title}"
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
+    
+    # save dataframe as text file in the created directory
+    file_path = f"{dir_path}/{url_title}.txt"
+    web_df.to_csv(file_path, sep="\n", index=False, header=None)
+    # web_df.to_csv(f"contents\{url_title}\{url_title}.txt", sep="\n", index=False, header=None)
+
 # Embedding Function
-def embedding(web_df):
-        # Get Embeddings related to the Sentences
-        web_df['Embedding'] = web_df['Sentences'].map(lambda x: get_embedding(x, engine='text-embedding-ada-002'))
-        # Convert Embeddings to Numpy Arrays
-        web_df['Embedding'] = web_df['Embedding'].swifter.apply(np.array)
-        emb_df = web_df
-        return emb_df
+def embedding(url_title):
+    dir_path = f"contents/{url_title}"
+    # with open(path, "r") as f:
+    #     file = f.read()
 
-# Similarity Function
-def similarity(df, search_query):
-    # Get Embedding related to the Search Query
-    search_term_vector = get_embedding(search_query, engine='text-embedding-ada-002')
-    # Generate Similarities related to Searched Embedding
+    # set maximum input size
+    max_input_size = 4096 #4096
+    # set number of output tokens
+    num_outputs = 2000
+    # set maximum chunk overlap
+    max_chunk_overlap = 20
+    # set chunk size limit
+    chunk_size_limit = 600 #600
 
-    # st.write(type(search_term_vector))
-    df['Similarities'] = df['Embedding'].swifter.apply(lambda x: cosine_similarity(x, search_term_vector))
-    return df
+    # define LLM
+    llm_predictor = LLMPredictor(llm=OpenAI(temperature=0.3, model_name="text-ada-001", max_tokens=num_outputs))
+    prompt_helper = PromptHelper(max_input_size, num_outputs, max_chunk_overlap, chunk_size_limit=chunk_size_limit)
+ 
+    documents = SimpleDirectoryReader(dir_path).load_data()
+    
+    index = GPTSimpleVectorIndex(
+        documents, llm_predictor=llm_predictor, prompt_helper=prompt_helper
+    )
 
-def df2pine(emb_df):
-    # Connect with Index
-    index_name = "scrapetoai"
-    index = pinecone.Index(index_name)
+    filename = url_title.rstrip(".txt")
+    index.save_to_disk(f'indexes/{filename}.json')
 
-    # Upsert the Data on Pinecone into Batches
-    from tqdm.auto import tqdm
-
-    count = 0  # we'll use the count to create unique IDs
-    batch_size = 32  # process everything in batches of 32
-    for i in tqdm(range(0, len(emb_df['Sentences']), batch_size)):
-        # set end position of batch
-        i_end = min(i+batch_size, len(emb_df['Sentences']))
-        # get batch of lines and IDs
-        lines_batch = emb_df['Sentences'][i: i+batch_size]
-        ids_batch = [str(n) for n in range(i, i_end)]
-        # prep metadata and upsert batch
-        meta = [{'text': line} for line in lines_batch]
-        emb = emb_df['Embedding'].apply(lambda x: x.tolist())
-        to_upsert = zip(ids_batch, emb, meta)
-        # upsert to Pinecone
-        index.upsert(vectors=list(to_upsert))
-
-    return index
-
-def pine2df():
-
-    # Connect with Index
-    index_name = "scrapetoai"
-    index = pinecone.Index(index_name)
-    data_length = index.describe_index_stats()["total_vector_count"]
-
-    # Fetch all the results
-    fetch_response = index.fetch(ids=[str(x) for x in list(range(0, data_length))])
-
-    # Create an Empty DataFrame
-    pine_df = pd.DataFrame(columns=["Sentences", "Embedding"])
-
-    # Put all the fetched data into the DataFrame
-    for i in range(data_length):
-        pine_df = pine_df.append({
-            "Sentences": fetch_response.get("vectors")[str(i)]["metadata"]["text"], 
-            "Embedding": fetch_response.get("vectors")[str(i)]["values"]}, 
-            ignore_index=True)
-
-    return pine_df
-
-# Show Final Results
-def show_results(pine_df, search_query):
-    simi_df = similarity(pine_df, search_query)
-    if "Embedding" in simi_df.columns:
-        if any(simi_df["Similarities"] > 0.8):
-            final_df = simi_df[simi_df["Similarities"] > 0.8].sort_values('Similarities', ascending=False)
-            results = ' '.join(final_df['Sentences'].tolist())
-            st.write(results)
-        else:
-            st.write("Sorry I don't have the relevant information")
-    else:
-        pass
+def ask_results(filename, search_query):
+    file_path = f"indexes/{filename}"
+    index = GPTSimpleVectorIndex.load_from_disk(file_path)
+    # while True: 
+    response = index.query(search_query, response_mode="compact")
+    st.write(response.response, unsafe_allow_html=True)
